@@ -1,0 +1,81 @@
+Guía de Instalación y Configuración en Ubuntu Server
+1. Actualiza el sistema
+bash
+sudo apt update && sudo apt upgrade -y
+
+2. Instala LXQT Desktop
+bash
+sudo apt install -y lxqt xorg lightdm
+sudo systemctl set-default graphical.target
+sudo reboot
+(Opcional: Si usas solo por administración remota/no necesitas LXQT, puedes omitir este paso.)
+
+3. Instala LAMP: Apache y PHP
+bash
+sudo apt install -y apache2 php libapache2-mod-php
+
+4. Instala FFMPEG, rename y yt-dlp
+bash
+sudo apt install -y ffmpeg rename yt-dlp
+
+5. Configura Apache para la aplicación
+a) Crea el directorio de la aplicación y subdirectorios
+bash
+sudo mkdir -p /var/www/html/conversor/{IN,TEMP,OUT,SCRIPTS,YTDL,logs}
+(Los corchetes {} crean todas las carpetas necesarias de una sola vez)
+b) Asigna propietario y permisos apropiados (www-data)
+bash
+sudo chown -R www-data:www-data /var/www/html/conversor
+sudo chmod -R 755 /var/www/html/conversor
+sudo chmod -R 770 /var/www/html/conversor/{IN,TEMP,OUT,YTDL,SCRIPTS,logs}
+(Las carpetas de trabajo permiten escritura y ejecución por www-data)
+
+6. Configura Apache y .htaccess
+a) Permite .htaccess en la configuración del sitio
+Edita /etc/apache2/sites-available/000-default.conf y agrega estas líneas dentro de <VirtualHost *:80>:
+apache
+<Directory /var/www/html/conversor/>
+  AllowOverride All
+  Require ip 10.204.2
+</Directory>
+(Esto habilita .htaccess y restringe acceso solo a la red interna 10.204.2.)*
+Luego reinicia Apache:
+bash
+sudo systemctl restart apache2
+b) Crea el archivo .htaccess
+En /var/www/html/conversor/.htaccess:
+apache
+# Bloquea métodos peligrosos y acceso directo a carpetas
+Options -Indexes
+
+<LimitExcept POST GET>
+  Deny from all
+</LimitExcept>
+<FilesMatch "\.(sh|exe|php|pl|js|py|bat|cgi)$">
+  Deny from all
+</FilesMatch>
+ErrorDocument 403 "Acceso denegado."
+
+7. Instala dependencias adicionales de PHP (opcional, para trabajo con multimedia/subidas seguras)
+bash
+sudo apt install -y php-xml php-mbstring php-fileinfo
+
+8. Habilita subida de archivos grandes y tiempo de ejecución extendido en PHP
+Edita /etc/php/$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')/apache2/php.ini y modifica:
+Code
+upload_max_filesize = 100M
+post_max_size = 100M
+max_execution_time = 300
+max_input_time = 300
+Reinicia Apache tras los cambios:
+bash
+sudo systemctl restart apache2
+
+9. Scripts ejecutables: permisos y shebang
+bash
+sudo chmod +x /var/www/html/conversor/SCRIPTS/*.sh
+
+10. Revisa los logs y asegúrate de que www-data pueda escribir
+bash
+sudo chown www-data:www-data /var/www/html/conversor/logs
+
